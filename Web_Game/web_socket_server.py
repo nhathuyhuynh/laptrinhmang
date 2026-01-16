@@ -96,10 +96,7 @@ async def main():
     print("  WEBSOCKET SERVER - GAME KÉO BÚA BAO")
     print("="*50)
     print("Server đang chạy tại: ws://localhost:8765")
-    print("Để chơi với người khác trên cùng máy:")
-    print("  1. Mở 2 tab trình duyệt")
-    print("  2. Mở file index.html ở cả 2 tab")
-    print("  3. Chọn 'Chơi Online' ở cả 2 tab")
+
     print("="*50)
     
     async with websockets.serve(server.handler, "localhost", 8765):

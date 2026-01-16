@@ -118,9 +118,9 @@
             </div>
             <div id="status" class="info">Chọn nước đi!</div>
             <div class="choices">
-                <div class="choice" onclick="choose('kéo')">✂️</div>
-                <div class="choice" onclick="choose('búa')">🔨</div>
-                <div class="choice" onclick="choose('bao')">📄</div>
+                <div class="choice" onclick="choose('kéo')">✌️</div>
+                <div class="choice" onclick="choose('búa')">✊️</div>
+                <div class="choice" onclick="choose('bao')">🖐</div>
             </div>
         </div>
 
@@ -128,9 +128,9 @@
         <div id="result" class="screen">
             <div class="result">
                 <div class="result-choices">
-                    <span id="yourChoice">✂️</span>
+                    <span id="yourChoice">✌️</span>
                     <span style="font-size:0.5em">VS</span>
-                    <span id="oppChoice">✂️</span>
+                    <span id="oppChoice">✌️</span>
                 </div>
                 <div id="resultMsg" class="info" style="font-size:1.5em">Bạn thắng!</div>
                 <div class="score">
@@ -144,7 +144,7 @@
 
     <script>
         let ws, mode, scores = [0, 0];
-        const icons = { 'kéo': '✂️', 'búa': '🔨', 'bao': '📄' };
+        const icons = { 'kéo': '✌️', 'búa': '✊️', 'bao': '🖐' };
 
         function show(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
