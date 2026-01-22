@@ -5,46 +5,33 @@ import hashlib
 from collections import defaultdict
 from datetime import datetime
 
-# --- THƯ VIỆN GIAO DIỆN ---
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
-from rich.theme import Theme
-
-# Cấu hình màu sắc
-custom_theme = Theme({
-    "info": "dim cyan",
-    "warning": "magenta",
-    "error": "bold red",
-    "success": "bold green",
-    "user": "bold yellow",
-    "room": "bold blue"
-})
-console = Console(theme=custom_theme)
-
-# Giả lập import db (Giữ nguyên logic của bạn)
-# Nếu bạn chạy lỗi dòng này, hãy đảm bảo file db.py nằm cùng thư mục
+# --- 1. KẾT NỐI DATABASE ---
+# Tự động tìm file db.py, nếu không thấy sẽ chạy chế độ giả lập
 try:
-    from db import init_db, save_message, load_messages, check_user, create_user
-    init_db()
-    console.print("[success]✔ Database loaded successfully[/success]")
+    import db
+    db.init_db()
+    print("✅ [SYSTEM] Database đã kết nối thành công!")
 except ImportError:
-    console.print("[error]❌ Không tìm thấy file db.py! Chạy chế độ giả lập DB...[/error]")
-    # Mock functions để code chạy được nếu thiếu db.py
-    def init_db(): pass
-    def save_message(r, s, m): pass
-    def load_messages(r): return []
-    def check_user(u): return True
-    def create_user(u, p): pass
+    print("❌ [ERROR] Không tìm thấy file db.py! Đang chạy chế độ giả lập (không lưu tin nhắn lâu dài).")
+    # Mock class để server không bị crash nếu thiếu file db
+    class db:
+        @staticmethod
+        def init_db(): pass
+        @staticmethod
+        def save_message(r, s, m): pass
+        @staticmethod
+        def load_messages(r): return []
+        @staticmethod
+        def check_user(u): return True # Luôn cho phép đăng nhập nếu không có DB
+        @staticmethod
+        def create_user(u, p): pass
 
-clients = {}            # ws -> {username, room}
-rooms = defaultdict(set)  # room -> set ws
+clients = {}            # Quản lý kết nối: ws -> {username, room}
+rooms = defaultdict(set)  # Quản lý phòng: room -> set(ws)
 
-# --- HÀM LOGGING ĐẸP ---
-def log(msg, style="info"):
-    time = datetime.now().strftime("%H:%M:%S")
-    console.print(f"[{time}] {msg}", style=style)
+# --- 2. HÀM HỖ TRỢ ---
+def get_time():
+    return datetime.now().strftime("%H:%M")
 
 def online(room):
     return len(rooms[room])
@@ -52,158 +39,145 @@ def online(room):
 async def broadcast(room, data):
     if room not in rooms: return
     
-    dead = []
-    # 🔥 SỬA QUAN TRỌNG: Thêm list() bao bên ngoài
-    # Lý do: Tạo ra một bản sao danh sách để duyệt, tránh lỗi "Set changed size"
+    # Tạo bản sao danh sách để gửi tin (tránh lỗi khi danh sách thay đổi đột ngột)
     connections = list(rooms[room]) 
-
     for ws in connections:
         try:
             await ws.send(json.dumps(data))
         except:
-            dead.append(ws)
-    
-    # Xóa các kết nối chết khỏi danh sách gốc
-    for ws in dead:
-        rooms[room].discard(ws)
+            rooms[room].discard(ws)
 
+# --- 3. XỬ LÝ CHÍNH (HANDLER) ---
 async def handler(ws):
     clients[ws] = None
-    addr = ws.remote_address
-    log(f"Kết nối mới từ: {addr[0]}:{addr[1]}", "info")
+    print(f"🔗 Kết nối mới từ: {ws.remote_address}")
 
     try:
         async for raw in ws:
-            data = json.loads(raw)
-            msg_type = data["type"]
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                continue # Bỏ qua tin nhắn rác không đúng định dạng
 
-            # ========= REGISTER =========
-            if msg_type == "register":
+            mode = data["type"]
+
+            # ========= ĐĂNG KÝ =========
+            if mode == "register":
                 username = data["username"]
                 password = data["password"]
-                
-                log(f"Đăng ký: [user]{username}[/user]", "warning")
-                
                 hashed = hashlib.sha256(password.encode()).hexdigest()
                 
                 try:
-                    create_user(username, hashed)
-                    await ws.send(json.dumps({
-                        "type": "register_ok",
-                        "message": "Đăng ký thành công"
-                    }))
-                    log(f"Đăng ký thành công: [user]{username}[/user]", "success")
-                except:
-                    await ws.send(json.dumps({
-                        "type": "register_fail",
-                        "message": "Username đã tồn tại"
-                    }))
-                    log(f"Đăng ký thất bại (Trùng tên): [user]{username}[/user]", "error")
+                    db.create_user(username, hashed)
+                    await ws.send(json.dumps({"type": "register_ok"}))
+                    print(f"📝 Đăng ký mới thành công: {username}")
+                except Exception as e:
+                    # Thường lỗi do trùng tên
+                    await ws.send(json.dumps({"type": "register_fail", "message": "Tên đã tồn tại!"}))
 
-            # ========= LOGIN =========
-            elif msg_type == "login":
+            # ========= ĐĂNG NHẬP =========
+            elif mode == "login":
                 username = data["username"]
                 room = data.get("room", "general")
                 
-                if check_user(username):
+                if db.check_user(username):
                     clients[ws] = {"username": username, "room": room}
                     rooms[room].add(ws)
+
+                    # Lấy tin nhắn cũ từ DB gửi cho user
+                    history = db.load_messages(room)
 
                     await ws.send(json.dumps({
                         "type": "login_success",
                         "username": username,
                         "room": room,
                         "online": online(room),
-                        "history": load_messages(room)
+                        "history": history
                     }))
 
+                    # Báo cho cả phòng biết có người mới vào
+                    await broadcast(room, {"type": "online", "online": online(room)})
+                    print(f"👉 {username} đã vào phòng: {room}")
+                else:
+                    await ws.send(json.dumps({"type": "login_fail"}))
+
+            # ========= TIN NHẮN (ĐÃ SỬA ĐỂ HẾT LAG) =========
+            elif mode == "message":
+                user_info = clients.get(ws)
+                if user_info:
+                    room = user_info["room"]
+                    sender = user_info["username"]
+                    msg = data["message"]
+                    now_time = get_time()
+                    
+                    # --- QUAN TRỌNG: GỬI TRƯỚC (Để mượt) ---
                     await broadcast(room, {
-                        "type": "online",
-                        "online": online(room)
+                        "type": "message",
+                        "sender": sender,
+                        "message": msg,
+                        "time": now_time 
                     })
                     
-                    log(f"User [user]{username}[/user] đã vào phòng [room]{room}[/room]", "success")
-                else:
-                    await ws.send(json.dumps({
-                        "type": "login_fail",
-                        "message": "User không tồn tại"
-                    }))
-                    log(f"Login thất bại: [user]{username}[/user]", "error")
+                    # --- IN LOG RA MÀN HÌNH ---
+                    # Nếu tin nhắn quá dài (như ảnh), chỉ in ngắn gọn
+                    log_msg = msg if len(msg) < 50 else "(Hình ảnh/Tin dài...)"
+                    print(f"💬 [{room}] {sender}: {log_msg}") 
 
-            # ========= MESSAGE =========
-            elif msg_type == "message":
-                user = clients.get(ws)
-                if not user: continue
+                    # --- LƯU SAU (Để không chặn server) ---
+                    try:
+                        db.save_message(room, sender, msg)
+                    except Exception as e:
+                        print(f"⚠️ Lỗi lưu tin nhắn vào DB: {e}")
 
-                room = user["room"]
-                sender = user["username"]
-                message = data["message"]
-
-                save_message(room, sender, message)
-                
-                # In tin nhắn ra terminal để theo dõi
-                console.print(f" 💬 [room]{room}[/room] | [user]{sender}[/user]: {message}")
-
-                await broadcast(room, {
-                    "type": "message",
-                    "sender": sender,
-                    "message": message,
-                    "room": room
-                })
-
-            # ========= SWITCH ROOM =========
-            elif msg_type == "switch_room":
-                user = clients.get(ws)
-                if not user: continue
-
-                old = user["room"]
-                new = data["room"]
-                if old == new: continue
-
-                rooms[old].discard(ws)
-                rooms[new].add(ws)
-                user["room"] = new
-
-                await broadcast(old, {"type": "online", "online": online(old)})
-                
-                await ws.send(json.dumps({
-                    "type": "switched",
-                    "room": new,
-                    "online": online(new),
-                    "history": load_messages(new)
-                }))
-
-                await broadcast(new, {"type": "online", "online": online(new)})
-                log(f"[user]{user['username']}[/user] chuyển: [room]{old}[/room] ➔ [room]{new}[/room]", "warning")
+            # ========= CHUYỂN PHÒNG =========
+            elif mode == "switch_room":
+                user_info = clients.get(ws)
+                if user_info:
+                    old_room = user_info["room"]
+                    new_room = data["room"]
+                    
+                    if old_room != new_room:
+                        # Rời phòng cũ
+                        rooms[old_room].discard(ws)
+                        # Vào phòng mới
+                        rooms[new_room].add(ws)
+                        user_info["room"] = new_room
+                        
+                        # Cập nhật số lượng online phòng cũ
+                        await broadcast(old_room, {"type": "online", "online": online(old_room)})
+                        
+                        # Gửi dữ liệu phòng mới cho user
+                        await ws.send(json.dumps({
+                            "type": "switched",
+                            "room": new_room,
+                            "online": online(new_room),
+                            "history": db.load_messages(new_room)
+                        }))
+                        
+                        # Cập nhật số lượng online phòng mới
+                        await broadcast(new_room, {"type": "online", "online": online(new_room)})
+                        print(f"🔄 {user_info['username']} chuyển: {old_room} -> {new_room}")
 
     except websockets.exceptions.ConnectionClosed:
-        pass
+        pass # User thoát bình thường
     except Exception as e:
-        log(f"Lỗi: {e}", "error")
+        print(f"⚠️ Lỗi xử lý: {e}")
     finally:
-        user = clients.get(ws)
-        if user:
-            room = user["room"]
-            username = user["username"]
+        # Dọn dẹp khi user thoát
+        user_info = clients.pop(ws, None)
+        if user_info:
+            room = user_info["room"]
             rooms[room].discard(ws)
-            await broadcast(room, {
-                "type": "online",
-                "online": online(room)
-            })
-            log(f"[user]{username}[/user] đã ngắt kết nối.", "error")
-        else:
-            log(f"Kết nối ẩn danh đã đóng.", "info")
-        clients.pop(ws, None)
+            await broadcast(room, {"type": "online", "online": online(room)})
+            print(f"👋 {user_info['username']} đã thoát.")
 
+# --- 4. CHẠY SERVER ---
 async def main():
-    # Hiển thị Banner đẹp mắt khi khởi động
-    banner = Text("ROCKET CHAT SERVER", justify="center", style="bold white on blue")
-    stats = f"Port: [bold green]8765[/bold green] | Protocol: [bold yellow]WebSocket[/bold yellow]"
-    
-    console.print(Panel(banner, style="blue"))
-    console.print(f"🚀 {stats}")
-    console.print("[italic gray]Đang chờ kết nối... (Nhấn Ctrl+C để dừng)[/italic gray]\n")
-
+    print("=" * 50)
+    print("🚀 SERVER CHAT ĐANG CHẠY (BẢN TỐI ƯU TỐC ĐỘ)")
+    print("👉 Địa chỉ: ws://localhost:8765")
+    print("👉 Bấm Ctrl + C để dừng")
+    print("=" * 50)
     async with websockets.serve(handler, "0.0.0.0", 8765):
         await asyncio.Future()
 
@@ -211,4 +185,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        console.print("\n[bold red]🛑 Server đã dừng![/bold red]")
+        print("\n🛑 Server đã dừng an toàn!")
