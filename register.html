@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Register</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 Đăng ký</h1>
+    <input id="u" placeholder="Username">
+    <input id="p" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    
+    <div class="link" onclick="location='login.html'">
+        Đã có tài khoản? Đăng nhập
+    </div>
+</div>
+
+<script>
+let ws = new WebSocket("ws://localhost:8765");
+
+// Xử lý lỗi kết nối
+ws.onerror = function() {
+    alert("Không thể kết nối đến server. Hãy chạy server.py trước!");
+};
+
+function register(){
+    const u = document.getElementById("u").value.trim();
+    const p = document.getElementById("p").value.trim();
+    
+    if(!u || !p){
+        alert("Nhập đầy đủ username và password");
+        return;
+    }
+    
+    ws.send(JSON.stringify({
+        type: "register",
+        username: u,
+        password: p
+    }));
+}
+
+ws.onmessage = e=>{
+    let d = JSON.parse(e.data);
+    if(d.type === "register_ok"){
+        alert(d.message || "Đăng ký thành công");
+        location="login.html";
+    }
+    if(d.type === "register_fail"){
+        alert(d.message || "Username đã tồn tại");
+    }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="container">
+    <h2>🔐 Đăng nhập</h2>
+
+    <input id="u" placeholder="Username"><br><br>
+    <input id="p" type="password" placeholder="Password"><br><br>
+    
+    <button onclick="login()">Login</button>
+    
+    <div class="link" onclick="location='register.html'">
+        Chưa có tài khoản? Đăng ký
+    </div>
+    
+    <p style="color:#666;font-size:12px;margin-top:10px">
+        Demo: dùng username bất kỳ (không cần password)
+    </p>
+</div>
+
+<script>
+let ws = new WebSocket("ws://localhost:8765");
+
+// Xử lý lỗi kết nối
+ws.onerror = function() {
+    alert("Không thể kết nối đến server. Hãy chạy server.py trước!");
+};
+
+function login(){
+    const u = document.getElementById("u").value.trim();
+    const p = document.getElementById("p").value.trim();
+    
+    if(!u){
+        alert("Nhập username");
+        return;
+    }
+
+    ws.send(JSON.stringify({
+        type: "login",
+        username: u,
+        password: p,
+        room: "general"
+    }));
+}
+
+ws.onmessage = e=>{
+    const d = JSON.parse(e.data);
+    if(d.type === "login_success"){
+        localStorage.setItem("username", d.username);
+        localStorage.setItem("room", d.room);
+        location = "chat.html";
+    } else if(d.type === "login_fail"){
+        alert(d.message || "Đăng nhập thất bại");
+    }
+};
+</script>
+
+</body>
+</html>

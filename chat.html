@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Chat</title>
+
+<style>
+body{
+    margin:0;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    font-family:sans-serif;
+}
+.app{
+    width:900px;
+    height:550px;
+    background:white;
+    display:flex;
+    border-radius:12px;
+    overflow:hidden;
+}
+.sidebar{
+    width:200px;
+    background:#f3f4f6;
+    padding:10px;
+}
+.sidebar li{
+    list-style:none;
+    padding:10px;
+    cursor:pointer;
+    border-radius:6px;
+}
+.sidebar li.active{
+    background:#667eea;
+    color:white;
+}
+.chat{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+.header{
+    padding:10px 15px;
+    background:#667eea;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+}
+.header-left {
+    display:flex;
+    align-items:center;
+    gap:15px;
+}
+.header-right {
+    display:flex;
+    align-items:center;
+}
+.logout-btn {
+    background:rgba(255,255,255,0.2);
+    border:1px solid rgba(255,255,255,0.3);
+    color:white;
+    padding:5px 15px;
+    border-radius:4px;
+    cursor:pointer;
+    font-size:12px;
+    transition:background 0.3s;
+}
+.logout-btn:hover {
+    background:rgba(255,255,255,0.3);
+}
+.messages{
+    flex:1;
+    padding:10px;
+    display:flex;
+    flex-direction:column;
+    overflow-y:auto;
+}
+.message{
+    max-width:60%;
+    padding:10px 15px;
+    border-radius:12px;
+    margin-bottom:8px;
+    word-wrap:break-word;
+}
+.me{
+    align-self:flex-end;
+    background:#667eea;
+    color:white;
+}
+.other{
+    align-self:flex-start;
+    background:#eee;
+    color:#333;
+}
+.sender{
+    font-size:11px;
+    opacity:.7;
+    margin-bottom:4px;
+    font-weight:bold;
+}
+.input{
+    display:flex;
+    padding:10px;
+    gap:10px;
+    border-top:1px solid #eee;
+}
+input{
+    flex:1;
+    padding:10px;
+    border:1px solid #ddd;
+    border-radius:6px;
+    outline:none;
+}
+input:focus{
+    border-color:#667eea;
+}
+button{
+    padding:10px 20px;
+    background:#667eea;
+    color:white;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    font-weight:bold;
+}
+button:hover{
+    background:#5a6fd8;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<div class="sidebar">
+<ul id="rooms">
+<li class="active" onclick="switchRoom('general')">general</li>
+<li onclick="switchRoom('study')">study</li>
+<li onclick="switchRoom('game')">game</li>
+</ul>
+</div>
+
+<div class="chat">
+<div class="header">
+    <div class="header-left">
+        👤 <b id="user"></b> |
+        📌 <b id="room"></b> |
+        👥 <span id="online">0</span>
+    </div>
+    <div class="header-right">
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<div class="messages" id="messages"></div>
+
+<div class="input">
+<input id="msg" placeholder="Nhập tin nhắn..." autocomplete="off">
+<button onclick="send()">Gửi</button>
+</div>
+</div>
+
+</div>
+
+<script>
+// Kiểm tra đăng nhập
+let username = localStorage.getItem("username");
+if (!username) {
+    alert("Bạn chưa đăng nhập!");
+    location.href = "login.html";
+}
+
+// Hiển thị username
+document.getElementById("user").innerText = username;
+
+// Khởi tạo room
+let room = localStorage.getItem("room") || "general";
+document.getElementById("room").innerText = room;
+
+// Biến lưu trữ
+let ws = null;
+let store = {};
+
+// Kết nối WebSocket
+function connectWebSocket() {
+    ws = new WebSocket("ws://localhost:8765");
+    
+    ws.onopen = () => {
+        console.log("✅ Đã kết nối tới server");
+        ws.send(JSON.stringify({
+            type: "login",
+            username: username,
+            room: room
+        }));
+    };
+    
+    ws.onmessage = (e) => {
+        try {
+            const d = JSON.parse(e.data);
+            handleMessage(d);
+        } catch (err) {
+            console.error("Lỗi parse JSON:", err);
+        }
+    };
+    
+    ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setTimeout(() => {
+            console.log("🔄 Đang kết nối lại...");
+            connectWebSocket();
+        }, 3000);
+    };
+    
+    ws.onclose = () => {
+        console.log("WebSocket đã đóng");
+    };
+}
+
+// Xử lý tin nhắn từ server
+function handleMessage(d) {
+    if (d.type === "login_success" || d.type === "switched") {
+        store[room] = d.history || [];
+        document.getElementById("online").innerText = d.online || 0;
+        renderMessages();
+    }
+    else if (d.type === "message") {
+        if (!store[d.room]) store[d.room] = [];
+        store[d.room].push(d);
+        if (d.room === room) {
+            addMessage(d.sender, d.message);
+        }
+    }
+    else if (d.type === "online") {
+        document.getElementById("online").innerText = d.online || 0;
+    }
+}
+
+// Thêm tin nhắn vào giao diện
+function addMessage(sender, text) {
+    const messagesDiv = document.getElementById("messages");
+    const div = document.createElement("div");
+    div.className = "message " + (sender === username ? "me" : "other");
+    div.innerHTML = `
+        <div class="sender">${escapeHtml(sender)}</div>
+        <div>${escapeHtml(text)}</div>
+    `;
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// Hiển thị toàn bộ tin nhắn
+function renderMessages() {
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.innerHTML = "";
+    (store[room] || []).forEach(m => {
+        addMessage(m.sender, m.message);
+    });
+}
+
+// Gửi tin nhắn
+function send() {
+    const input = document.getElementById("msg");
+    const text = input.value.trim();
+    
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    
+    ws.send(JSON.stringify({
+        type: "message",
+        message: text
+    }));
+    
+    input.value = "";
+    input.focus();
+}
+
+// Chuyển room
+function switchRoom(r) {
+    if (r === room) return;
+    
+    room = r;
+    localStorage.setItem("room", r);
+    document.getElementById("room").innerText = r;
+    
+    // Cập nhật active trong sidebar
+    document.querySelectorAll(".sidebar li").forEach(li => {
+        li.classList.remove("active");
+        if (li.textContent === r) {
+            li.classList.add("active");
+        }
+    });
+    
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: "switch_room",
+            room: r
+        }));
+    } else {
+        connectWebSocket();
+    }
+}
+
+// Đăng xuất
+function logout() {
+    if (confirm("Bạn có chắc muốn đăng xuất?")) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+        }
+        localStorage.clear();
+        location.href = "index.html";
+    }
+}
+
+// Escape HTML để tránh XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Xử lý phím Enter
+document.getElementById("msg").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send();
+    }
+});
+
+// Khởi tạo
+connectWebSocket();
+</script>
+
+</body>
+</html>
