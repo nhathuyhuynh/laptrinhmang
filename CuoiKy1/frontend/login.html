@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>🔐 Đăng nhập</h1>
+
+    <input id="u" placeholder="Username">
+    <input id="p" type="password" placeholder="Password">
+
+    <button onclick="login()">Login</button>
+
+    <div class="link" onclick="location='register.html'">
+        Chưa có tài khoản? Đăng ký
+    </div>
+</div>
+
+<script>
+let ws = new WebSocket("ws://localhost:8765");
+
+function login(){
+    const u = document.getElementById("u").value.trim();
+    const p = document.getElementById("p").value.trim();
+
+    if(!u || !p){
+        alert("Nhập đủ username và password");
+        return;
+    }
+
+    ws.send(JSON.stringify({
+        type:"login",
+        username: u,
+        password: p,
+        room: "general"   // ✅ FIX Ở ĐÂY
+    }));
+}
+
+ws.onmessage = e=>{
+    const d = JSON.parse(e.data);
+
+    if(d.type === "login_success"){
+        localStorage.setItem("username", d.username);
+        localStorage.setItem("role", d.role);
+        localStorage.setItem("room", d.room);
+        location = "chat.html";
+    }
+
+    if(d.type === "login_fail"){
+        alert("Sai tài khoản hoặc mật khẩu");
+    }
+};
+</script>
+
+</body>
+</html>
