@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Đăng ký</title>
+<title>Đăng ký tài khoản</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -10,62 +10,72 @@
 <div class="container">
     <h1>📝 Đăng ký</h1>
 
-    <input id="u" placeholder="Tên tài khoản mới" autofocus>
+    <input id="u" placeholder="Tên đăng nhập mới" autofocus>
     <input id="p" type="password" placeholder="Mật khẩu">
 
-    <button onclick="register()">Đăng ký</button>
+    <button onclick="register()">Đăng Ký</button>
 
-    <div class="link" onclick="location='login.html'">
-        Đã có tài khoản? <b>Đăng nhập</b>
+    <div class="link" onclick="window.location.href='login.html'">
+        Đã có tài khoản? <b>Đăng nhập ngay</b>
     </div>
 </div>
 
 <script>
-const ws = new WebSocket("ws://localhost:8765");
+    const ws = new WebSocket("ws://localhost:8765");
 
-function register(){
-    const u = document.getElementById("u").value.trim();
-    const p = document.getElementById("p").value.trim();
+    ws.onopen = () => {
+        console.log("Đã kết nối Server đăng ký!");
+    };
 
-    if(!u || !p){
-        alert("Vui lòng nhập đủ thông tin!");
-        return;
+    function register() {
+        const u = document.getElementById("u").value.trim();
+        const p = document.getElementById("p").value.trim();
+
+        if (!u || !p) {
+            alert("Vui lòng nhập đầy đủ tên và mật khẩu!");
+            return;
+        }
+
+        // Gửi lệnh đăng ký
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "register",
+                username: u,
+                password: p
+            }));
+        } else {
+            alert("Chưa kết nối được Server. Hãy F5 thử lại!");
+        }
     }
 
-    ws.send(JSON.stringify({
-        type: "register",
-        username: u,
-        password: p
-    }));
-}
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
 
-ws.onmessage = e => {
-    const d = JSON.parse(e.data);
+        // --- NẾU THÀNH CÔNG (ĐOẠN ĐÃ SỬA) ---
+        if (data.type === "register_ok") {
+            // Dùng confirm để hiện bảng OK/Cancel. Bấm gì cũng sẽ chuyển trang.
+            if(confirm("✅ Đăng ký thành công! Bấm OK để đăng nhập ngay.")) {
+                // replace tốt hơn href vì nó không cho user bấm Back để quay lại trang đăng ký
+                window.location.replace("login.html");
+            } else {
+                window.location.href = "login.html";
+            }
+        }
 
-    // --- PHẦN QUAN TRỌNG NHẤT Ở ĐÂY ---
-    if(d.type === "register_ok"){
-        alert("Đăng ký thành công! Bạn sẽ được chuyển đến trang đăng nhập.");
-        
-        // Mẹo nhỏ: Lưu tên vừa đăng ký để sang kia đỡ phải gõ lại
-        localStorage.setItem("last_registered_user", document.getElementById("u").value);
-        
-        location = "login.html"; // <--- LỆNH CHUYỂN TRANG
-    }
-    // -----------------------------------
+        // --- NẾU THẤT BẠI ---
+        if (data.type === "register_fail") {
+            alert("❌ Lỗi: " + (data.message || "Tên này đã có người dùng!"));
+        }
+    };
 
-    if(d.type === "register_fail"){
-        alert(d.message || "Tên tài khoản đã tồn tại!");
-    }
-};
+    // --- XỬ LÝ PHÍM ENTER ---
+    document.getElementById("u").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") document.getElementById("p").focus();
+    });
 
-// --- XỬ LÝ PHÍM ENTER (UX) ---
-document.getElementById("u").addEventListener("keydown", e => {
-    if (e.key === "Enter") document.getElementById("p").focus();
-});
-
-document.getElementById("p").addEventListener("keydown", e => {
-    if (e.key === "Enter") register();
-});
+    document.getElementById("p").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") register();
+    });
 </script>
 
 </body>
