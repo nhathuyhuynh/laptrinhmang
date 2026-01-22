@@ -50,12 +50,20 @@ def online(room):
     return len(rooms[room])
 
 async def broadcast(room, data):
+    if room not in rooms: return
+    
     dead = []
-    for ws in rooms[room]:
+    # 🔥 SỬA QUAN TRỌNG: Thêm list() bao bên ngoài
+    # Lý do: Tạo ra một bản sao danh sách để duyệt, tránh lỗi "Set changed size"
+    connections = list(rooms[room]) 
+
+    for ws in connections:
         try:
             await ws.send(json.dumps(data))
         except:
             dead.append(ws)
+    
+    # Xóa các kết nối chết khỏi danh sách gốc
     for ws in dead:
         rooms[room].discard(ws)
 

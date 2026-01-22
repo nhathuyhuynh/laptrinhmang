@@ -23,6 +23,16 @@
 <script>
 let ws = new WebSocket("ws://localhost:8765");
 
+// Tự điền tên nếu vừa đăng ký xong (Lấy từ localStorage vẫn ok cho tiện ích này)
+window.onload = function() {
+    const lastUser = localStorage.getItem("last_registered_user");
+    if(lastUser) {
+        document.getElementById("u").value = lastUser;
+        document.getElementById("p").focus();
+        localStorage.removeItem("last_registered_user");
+    }
+}
+
 function login(){
     const u = document.getElementById("u").value.trim();
     const p = document.getElementById("p").value.trim();
@@ -37,9 +47,11 @@ function login(){
 ws.onmessage = e=>{
     const d = JSON.parse(e.data);
     if(d.type === "login_success"){
-        localStorage.setItem("username", d.username);
-        localStorage.setItem("room", d.room);
-        localStorage.setItem("logged", "true");
+        // 🔥 ĐỔI THÀNH SESSION STORAGE (Tắt tab là mất)
+        sessionStorage.setItem("username", d.username);
+        sessionStorage.setItem("room", d.room);
+        sessionStorage.setItem("logged", "true");
+        
         location = "chat.html";
     }
     if(d.type === "login_fail"){
@@ -47,7 +59,7 @@ ws.onmessage = e=>{
     }
 };
 
-// Enter để nhảy dòng / login
+// Enter để login
 document.getElementById("u").addEventListener("keydown", e => {
     if (e.key === "Enter") document.getElementById("p").focus();
 });

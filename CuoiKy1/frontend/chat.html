@@ -4,38 +4,31 @@
 <meta charset="UTF-8">
 <title>Phòng Chat</title>
 <style>
-/* CSS CƠ BẢN */
+/* --- CSS GIỮ NGUYÊN NHƯ CŨ --- */
 body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;background:linear-gradient(135deg,#667eea,#764ba2);font-family:sans-serif}
 .app{width:900px;height:550px;background:white;display:flex;border-radius:12px;overflow:hidden;box-shadow:0 0 20px rgba(0,0,0,0.2)}
-
-/* SIDEBAR */
-.sidebar{width:200px;background:#f3f4f6;padding:10px;display:flex;flex-direction:column;justify-content:space-between}
-.sidebar ul{padding:0}
-.sidebar li{list-style:none;padding:12px;cursor:pointer;border-radius:6px;margin-bottom:5px;font-weight:500;color:#555}
-.sidebar li:hover{background:#e0e0e0}
-.sidebar li.active{background:#667eea;color:white}
-
-/* LOGOUT BUTTON */
-.logout-btn {
-    background: #ff4757; color: white; border: none; padding: 10px;
-    border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;
-    margin-top: auto; /* Đẩy xuống đáy */
-}
+.sidebar{width:220px;background:#f3f4f6;padding:15px;display:flex;flex-direction:column;border-right:1px solid #ddd}
+.room-list{flex:1;overflow-y:auto; margin-bottom: 10px;}
+.room-list ul{padding:0;margin:0}
+.room-list li{list-style:none;padding:10px;cursor:pointer;border-radius:6px;margin-bottom:5px;font-weight:500;color:#555;transition:0.2s}
+.room-list li:hover{background:#e0e0e0}
+.room-list li.active{background:#667eea;color:white}
+.add-room-area {display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 15px;}
+.add-room-area input {width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; outline: none; font-size: 13px;}
+.add-room-area button {background: #2ed573; color: white; border: none; padding: 0 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 18px;}
+.add-room-area button:hover { background: #26af61; }
+.logout-btn {background: #ff4757; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;}
 .logout-btn:hover { background: #e84118; }
-
-/* CHAT AREA */
 .chat{flex:1;display:flex;flex-direction:column}
-.header{padding:15px;background:#667eea;color:white;font-size:16px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}
+.header{padding:15px;background:#667eea;color:white;font-size:16px;box-shadow:0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between;}
 .messages{flex:1;padding:15px;display:flex;flex-direction:column;overflow-y:auto;background:#fff}
-.message{max-width:65%;padding:10px 14px;border-radius:15px;margin-bottom:8px;font-size:14px;line-height:1.4}
+.message{max-width:70%;padding:10px 14px;border-radius:15px;margin-bottom:8px;font-size:14px;line-height:1.4;word-wrap: break-word;}
 .me{align-self:flex-end;background:#667eea;color:white;border-bottom-right-radius:2px}
 .other{align-self:flex-start;background:#eee;color:#333;border-bottom-left-radius:2px}
 .sender{font-size:11px;opacity:0.8;margin-bottom:4px;font-weight:bold}
-
-/* INPUT AREA */
-.input{display:flex;padding:15px;border-top:1px solid #eee}
-input{flex:1;padding:12px;border:1px solid #ddd;border-radius:20px;outline:none}
-input:focus{border-color:#667eea}
+.input{display:flex;padding:15px;border-top:1px solid #eee; background: #fff;}
+input#msg{flex:1;padding:12px;border:1px solid #ddd;border-radius:20px;outline:none}
+input#msg:focus{border-color:#667eea}
 button.send-btn{margin-left:10px;padding:0 20px;background:#667eea;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:bold}
 button.send-btn:hover{background:#5a67d8}
 </style>
@@ -43,33 +36,34 @@ button.send-btn:hover{background:#5a67d8}
 <body>
 
 <script>
-const username = localStorage.getItem("username");
-const logged = localStorage.getItem("logged");
+const username = sessionStorage.getItem("username");
+const logged = sessionStorage.getItem("logged");
 if(!username || logged !== "true") location = "login.html";
 </script>
 
 <div class="app">
     <div class="sidebar">
-        <div>
+        <h3>📂 Danh sách phòng</h3>
+        <div class="add-room-area">
+            <input id="newRoomName" placeholder="Tên phòng mới..." onkeydown="if(event.key==='Enter') createRoom()">
+            <button onclick="createRoom()" title="Tạo phòng">+</button>
+        </div>
+        <div class="room-list">
             <ul id="rooms">
-                <li class="active" onclick="switchRoom('general')">💬 General</li>
-                <li onclick="switchRoom('study')">📚 Góc học tập</li>
-                <li onclick="switchRoom('game')">🎮 Game</li>
+                <li class="active" onclick="switchRoom('general')"># general</li>
+                <li onclick="switchRoom('study')"># study</li>
+                <li onclick="switchRoom('game')"># game</li>
             </ul>
         </div>
-        
         <button class="logout-btn" onclick="logout()">🚪 Đăng xuất</button>
     </div>
 
     <div class="chat">
         <div class="header">
-            👤 <b><span id="user">...</span></b> | 
-            📌 Phòng: <b><span id="room">...</span></b> | 
-            🟢 Online: <span id="online">0</span>
+            <span>📌 Phòng: <b id="roomNameDisplay">...</b></span>
+            <span>👤 <b id="user">...</b> | 🟢 <span id="online">0</span></span>
         </div>
-
         <div class="messages" id="messages"></div>
-
         <div class="input">
             <input id="msg" placeholder="Nhập tin nhắn..." autofocus>
             <button class="send-btn" onclick="send()">Gửi ➤</button>
@@ -78,52 +72,53 @@ if(!username || logged !== "true") location = "login.html";
 </div>
 
 <script>
-// --- KHỞI TẠO ---
+// --- KHỞI TẠO TỪ SESSION STORAGE ---
 document.getElementById("user").innerText = username;
-let room = localStorage.getItem("room") || "general";
+let room = sessionStorage.getItem("room") || "general"; // Lấy từ session
 let ws = new WebSocket("ws://localhost:8765");
 let store = {};
 
-// Cập nhật tên phòng hiển thị
-function updateRoomName(r){
-    let display = r;
-    if(r==='general') display = 'General';
-    if(r==='study') display = 'Góc học tập';
-    if(r==='game') display = 'Game';
-    document.getElementById("room").innerText = display;
+function updateRoomUI(r){
+    document.getElementById("roomNameDisplay").innerText = r;
+    document.querySelectorAll(".room-list li").forEach(li => li.classList.remove("active"));
+    let exist = [...document.querySelectorAll(".room-list li")].find(li => li.innerText === "# " + r);
+    if(exist){
+        exist.classList.add("active");
+    } else {
+        const ul = document.getElementById("rooms");
+        const li = document.createElement("li");
+        li.innerText = "# " + r;
+        li.onclick = () => switchRoom(r);
+        li.classList.add("active");
+        ul.prepend(li);
+    }
 }
-updateRoomName(room);
 
-// --- WEBSOCKET ---
 ws.onopen = ()=>{
     ws.send(JSON.stringify({ type:"login", username, room }));
+    updateRoomUI(room);
 };
 
 ws.onmessage = e=>{
     const d = JSON.parse(e.data);
-
     if(d.type === "login_success" || d.type === "switched"){
         store[room] = d.history || [];
         document.getElementById("online").innerText = d.online;
         render();
     }
-
     if(d.type === "message"){
         if(!store[d.room]) store[d.room] = [];
         store[d.room].push({ sender: d.sender, message: d.message });
         if(d.room === room) add(d.sender, d.message);
     }
-
     if(d.type === "online"){
         document.getElementById("online").innerText = d.online;
     }
 };
 
-// --- HÀM XỬ LÝ ---
 function add(sender, text){
     const div = document.createElement("div");
     div.className = "message " + (sender === username ? "me":"other");
-    // Nếu là người khác gửi thì hiện tên, mình gửi thì ẩn tên cho đẹp
     let content = sender === username ? `<div>${text}</div>` : `<div class="sender">${sender}</div><div>${text}</div>`;
     div.innerHTML = content;
     messages.appendChild(div);
@@ -143,29 +138,30 @@ function send(){
     msg.focus();
 }
 
-// Enter để gửi
 msg.addEventListener("keydown",e=>{ if(e.key==="Enter") send(); });
 
 function switchRoom(r){
     if(r===room) return;
     room=r;
-    localStorage.setItem("room",r);
-    updateRoomName(r);
-    
+    sessionStorage.setItem("room",r); // Lưu vào session
+    updateRoomUI(r);
     ws.send(JSON.stringify({type:"switch_room",room:r}));
-    
-    // Đổi màu menu
-    document.querySelectorAll(".sidebar li").forEach(li=>li.classList.remove("active"));
-    const map = {'general':0, 'study':1, 'game':2}; // Map index đơn giản
-    document.querySelectorAll(".sidebar li")[map[r]].classList.add("active");
 }
 
-// --- HÀM ĐĂNG XUẤT ---
+function createRoom(){
+    const input = document.getElementById("newRoomName");
+    const name = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+    if(!name){ alert("Vui lòng nhập tên phòng!"); return; }
+    if(name === room) return;
+    switchRoom(name);
+    input.value = "";
+}
+
 function logout(){
     if(confirm("Bạn có chắc muốn đăng xuất?")){
-        localStorage.clear(); // Xóa token/user
-        ws.close(); // Ngắt kết nối
-        location = "login.html"; // Quay về trang login
+        sessionStorage.clear(); // Xóa session
+        ws.close();
+        location = "login.html";
     }
 }
 </script>

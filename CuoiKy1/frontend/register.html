@@ -27,28 +27,42 @@ function register(){
     const u = document.getElementById("u").value.trim();
     const p = document.getElementById("p").value.trim();
 
-    if(!u || !p) return alert("Vui lòng nhập đủ thông tin!");
+    if(!u || !p){
+        alert("Vui lòng nhập đủ thông tin!");
+        return;
+    }
 
     ws.send(JSON.stringify({
-        type: "register", username: u, password: p
+        type: "register",
+        username: u,
+        password: p
     }));
 }
 
 ws.onmessage = e => {
     const d = JSON.parse(e.data);
+
+    // --- PHẦN QUAN TRỌNG NHẤT Ở ĐÂY ---
     if(d.type === "register_ok"){
-        alert("Đăng ký thành công! Vui lòng đăng nhập.");
-        location = "login.html";
+        alert("Đăng ký thành công! Bạn sẽ được chuyển đến trang đăng nhập.");
+        
+        // Mẹo nhỏ: Lưu tên vừa đăng ký để sang kia đỡ phải gõ lại
+        localStorage.setItem("last_registered_user", document.getElementById("u").value);
+        
+        location = "login.html"; // <--- LỆNH CHUYỂN TRANG
     }
+    // -----------------------------------
+
     if(d.type === "register_fail"){
         alert(d.message || "Tên tài khoản đã tồn tại!");
     }
 };
 
-// Enter xử lý
+// --- XỬ LÝ PHÍM ENTER (UX) ---
 document.getElementById("u").addEventListener("keydown", e => {
     if (e.key === "Enter") document.getElementById("p").focus();
 });
+
 document.getElementById("p").addEventListener("keydown", e => {
     if (e.key === "Enter") register();
 });
