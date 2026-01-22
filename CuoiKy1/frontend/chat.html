@@ -2,144 +2,101 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Chat</title>
-
+<title>Phòng Chat</title>
 <style>
-body{
-    margin:0;
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background:linear-gradient(135deg,#667eea,#764ba2);
-    font-family:sans-serif;
+/* CSS CƠ BẢN */
+body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;background:linear-gradient(135deg,#667eea,#764ba2);font-family:sans-serif}
+.app{width:900px;height:550px;background:white;display:flex;border-radius:12px;overflow:hidden;box-shadow:0 0 20px rgba(0,0,0,0.2)}
+
+/* SIDEBAR */
+.sidebar{width:200px;background:#f3f4f6;padding:10px;display:flex;flex-direction:column;justify-content:space-between}
+.sidebar ul{padding:0}
+.sidebar li{list-style:none;padding:12px;cursor:pointer;border-radius:6px;margin-bottom:5px;font-weight:500;color:#555}
+.sidebar li:hover{background:#e0e0e0}
+.sidebar li.active{background:#667eea;color:white}
+
+/* LOGOUT BUTTON */
+.logout-btn {
+    background: #ff4757; color: white; border: none; padding: 10px;
+    border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%;
+    margin-top: auto; /* Đẩy xuống đáy */
 }
-.app{
-    width:900px;
-    height:550px;
-    background:white;
-    display:flex;
-    border-radius:12px;
-    overflow:hidden;
-}
-.sidebar{
-    width:200px;
-    background:#f3f4f6;
-    padding:10px;
-}
-.sidebar li{
-    list-style:none;
-    padding:10px;
-    cursor:pointer;
-    border-radius:6px;
-}
-.sidebar li.active{
-    background:#667eea;
-    color:white;
-}
-.chat{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-}
-.header{
-    padding:10px;
-    background:#667eea;
-    color:white;
-}
-.messages{
-    flex:1;
-    padding:10px;
-    display:flex;
-    flex-direction:column;
-    overflow-y:auto;
-}
-.message{
-    max-width:60%;
-    padding:10px;
-    border-radius:12px;
-    margin-bottom:8px;
-}
-.me{
-    align-self:flex-end;
-    background:#667eea;
-    color:white;
-}
-.other{
-    align-self:flex-start;
-    background:#eee;
-}
-.sender{
-    font-size:12px;
-    opacity:.7;
-}
-.input{
-    display:flex;
-    padding:10px;
-}
-input{flex:1}
+.logout-btn:hover { background: #e84118; }
+
+/* CHAT AREA */
+.chat{flex:1;display:flex;flex-direction:column}
+.header{padding:15px;background:#667eea;color:white;font-size:16px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}
+.messages{flex:1;padding:15px;display:flex;flex-direction:column;overflow-y:auto;background:#fff}
+.message{max-width:65%;padding:10px 14px;border-radius:15px;margin-bottom:8px;font-size:14px;line-height:1.4}
+.me{align-self:flex-end;background:#667eea;color:white;border-bottom-right-radius:2px}
+.other{align-self:flex-start;background:#eee;color:#333;border-bottom-left-radius:2px}
+.sender{font-size:11px;opacity:0.8;margin-bottom:4px;font-weight:bold}
+
+/* INPUT AREA */
+.input{display:flex;padding:15px;border-top:1px solid #eee}
+input{flex:1;padding:12px;border:1px solid #ddd;border-radius:20px;outline:none}
+input:focus{border-color:#667eea}
+button.send-btn{margin-left:10px;padding:0 20px;background:#667eea;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:bold}
+button.send-btn:hover{background:#5a67d8}
 </style>
 </head>
-
 <body>
 
 <script>
 const username = localStorage.getItem("username");
-if(!username){
-    alert("Bạn chưa đăng nhập");
-    location = "login.html";
-}
+const logged = localStorage.getItem("logged");
+if(!username || logged !== "true") location = "login.html";
 </script>
 
 <div class="app">
+    <div class="sidebar">
+        <div>
+            <ul id="rooms">
+                <li class="active" onclick="switchRoom('general')">💬 General</li>
+                <li onclick="switchRoom('study')">📚 Góc học tập</li>
+                <li onclick="switchRoom('game')">🎮 Game</li>
+            </ul>
+        </div>
+        
+        <button class="logout-btn" onclick="logout()">🚪 Đăng xuất</button>
+    </div>
 
-<div class="sidebar">
-<ul id="rooms">
-<li class="active" onclick="switchRoom('general')">general</li>
-<li onclick="switchRoom('study')">study</li>
-<li onclick="switchRoom('game')">game</li>
-</ul>
+    <div class="chat">
+        <div class="header">
+            👤 <b><span id="user">...</span></b> | 
+            📌 Phòng: <b><span id="room">...</span></b> | 
+            🟢 Online: <span id="online">0</span>
+        </div>
+
+        <div class="messages" id="messages"></div>
+
+        <div class="input">
+            <input id="msg" placeholder="Nhập tin nhắn..." autofocus>
+            <button class="send-btn" onclick="send()">Gửi ➤</button>
+        </div>
+    </div>
 </div>
-
-<div class="chat">
-<div class="header">
-👤 <b id="user"></b> |
-📌 <b id="room"></b> |
-👥 <span id="online">0</span>
-</div>
-
-<div class="messages" id="messages"></div>
-
-<div class="input">
-<input id="msg" placeholder="Enter message">
-<button onclick="send()">Send</button>
-</div>
-</div>
-
-</div>
-
 
 <script>
-    const username = localStorage.getItem("username");
-
-if (!username) {
-    alert("Bạn chưa đăng nhập!");
-    location.href = "login.html";
-}
+// --- KHỞI TẠO ---
 document.getElementById("user").innerText = username;
 let room = localStorage.getItem("room") || "general";
-document.getElementById("room").innerText = room;
-
 let ws = new WebSocket("ws://localhost:8765");
 let store = {};
 
+// Cập nhật tên phòng hiển thị
+function updateRoomName(r){
+    let display = r;
+    if(r==='general') display = 'General';
+    if(r==='study') display = 'Góc học tập';
+    if(r==='game') display = 'Game';
+    document.getElementById("room").innerText = display;
+}
+updateRoomName(room);
 
+// --- WEBSOCKET ---
 ws.onopen = ()=>{
-    ws.send(JSON.stringify({
-        type:"login",
-        username,
-        room
-    }));
+    ws.send(JSON.stringify({ type:"login", username, room }));
 };
 
 ws.onmessage = e=>{
@@ -152,8 +109,8 @@ ws.onmessage = e=>{
     }
 
     if(d.type === "message"){
-        if(!store[d.room]) store[d.room]=[];
-        store[d.room].push(d);
+        if(!store[d.room]) store[d.room] = [];
+        store[d.room].push({ sender: d.sender, message: d.message });
         if(d.room === room) add(d.sender, d.message);
     }
 
@@ -162,10 +119,13 @@ ws.onmessage = e=>{
     }
 };
 
+// --- HÀM XỬ LÝ ---
 function add(sender, text){
     const div = document.createElement("div");
     div.className = "message " + (sender === username ? "me":"other");
-    div.innerHTML = `<div class="sender">${sender}</div><div>${text}</div>`;
+    // Nếu là người khác gửi thì hiện tên, mình gửi thì ẩn tên cho đẹp
+    let content = sender === username ? `<div>${text}</div>` : `<div class="sender">${sender}</div><div>${text}</div>`;
+    div.innerHTML = content;
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
 }
@@ -178,25 +138,35 @@ function render(){
 function send(){
     const t = msg.value.trim();
     if(!t) return;
-    ws.send(JSON.stringify({
-        type:"message",
-        message:t
-    }));
+    ws.send(JSON.stringify({ type:"message", message:t }));
     msg.value="";
+    msg.focus();
 }
 
-msg.addEventListener("keydown",e=>{
-    if(e.key==="Enter") send();
-});
+// Enter để gửi
+msg.addEventListener("keydown",e=>{ if(e.key==="Enter") send(); });
 
 function switchRoom(r){
     if(r===room) return;
     room=r;
     localStorage.setItem("room",r);
-    document.getElementById("room").innerText=r;
+    updateRoomName(r);
+    
     ws.send(JSON.stringify({type:"switch_room",room:r}));
+    
+    // Đổi màu menu
     document.querySelectorAll(".sidebar li").forEach(li=>li.classList.remove("active"));
-    [...document.querySelectorAll(".sidebar li")].find(li=>li.innerText===r)?.classList.add("active");
+    const map = {'general':0, 'study':1, 'game':2}; // Map index đơn giản
+    document.querySelectorAll(".sidebar li")[map[r]].classList.add("active");
+}
+
+// --- HÀM ĐĂNG XUẤT ---
+function logout(){
+    if(confirm("Bạn có chắc muốn đăng xuất?")){
+        localStorage.clear(); // Xóa token/user
+        ws.close(); // Ngắt kết nối
+        location = "login.html"; // Quay về trang login
+    }
 }
 </script>
 

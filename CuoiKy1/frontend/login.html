@@ -2,29 +2,35 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Login</title>
+<title>Đăng nhập</title>
+<link rel="stylesheet" href="styles.css">
 </head>
-<body style="font-family:sans-serif">
+<body>
 
-<h2>🔐 Đăng nhập</h2>
+<div class="container">
+    <h1>🔐 Đăng nhập</h1>
 
-<input id="u" placeholder="Username"><br><br>
-<button onclick="login()">Login</button>
+    <input id="u" placeholder="Tên tài khoản" autofocus>
+    <input id="p" type="password" placeholder="Mật khẩu">
+
+    <button onclick="login()">Đăng nhập</button>
+
+    <div class="link" onclick="location='register.html'">
+        Chưa có tài khoản? <b>Đăng ký ngay</b>
+    </div>
+</div>
 
 <script>
 let ws = new WebSocket("ws://localhost:8765");
 
 function login(){
     const u = document.getElementById("u").value.trim();
-    if(!u){
-        alert("Nhập username");
-        return;
-    }
+    const p = document.getElementById("p").value.trim();
+
+    if(!u || !p) return alert("Vui lòng nhập đủ thông tin!");
 
     ws.send(JSON.stringify({
-        type:"login",
-        username: u,
-        room: "general"
+        type:"login", username: u, password: p, room: "general"
     }));
 }
 
@@ -33,9 +39,21 @@ ws.onmessage = e=>{
     if(d.type === "login_success"){
         localStorage.setItem("username", d.username);
         localStorage.setItem("room", d.room);
+        localStorage.setItem("logged", "true");
         location = "chat.html";
     }
+    if(d.type === "login_fail"){
+        alert("Sai tài khoản hoặc mật khẩu!");
+    }
 };
+
+// Enter để nhảy dòng / login
+document.getElementById("u").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("p").focus();
+});
+document.getElementById("p").addEventListener("keydown", e => {
+    if (e.key === "Enter") login();
+});
 </script>
 
 </body>

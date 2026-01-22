@@ -1,43 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Register</title>
+<title>Đăng ký</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div class="container">
     <h1>📝 Đăng ký</h1>
-    <input id="u" placeholder="Username">
-    <input id="p" type="password" placeholder="Password">
-    <button onclick="register()">Register</button>
+
+    <input id="u" placeholder="Tên tài khoản mới" autofocus>
+    <input id="p" type="password" placeholder="Mật khẩu">
+
+    <button onclick="register()">Đăng ký</button>
+
     <div class="link" onclick="location='login.html'">
-        Đã có tài khoản? Đăng nhập
+        Đã có tài khoản? <b>Đăng nhập</b>
     </div>
 </div>
 
 <script>
-let ws = new WebSocket("ws://localhost:8765");
+const ws = new WebSocket("ws://localhost:8765");
 
 function register(){
+    const u = document.getElementById("u").value.trim();
+    const p = document.getElementById("p").value.trim();
+
+    if(!u || !p) return alert("Vui lòng nhập đủ thông tin!");
+
     ws.send(JSON.stringify({
-        type:"register",
-        username:u.value,
-        password:p.value
+        type: "register", username: u, password: p
     }));
 }
 
-ws.onmessage = e=>{
-    let d = JSON.parse(e.data);
-    if(d.type==="register_ok"){
-        alert("Đăng ký thành công");
-        location="login.html";
+ws.onmessage = e => {
+    const d = JSON.parse(e.data);
+    if(d.type === "register_ok"){
+        alert("Đăng ký thành công! Vui lòng đăng nhập.");
+        location = "login.html";
     }
-    if(d.type==="register_fail"){
-        alert("Username đã tồn tại");
+    if(d.type === "register_fail"){
+        alert(d.message || "Tên tài khoản đã tồn tại!");
     }
-}
+};
+
+// Enter xử lý
+document.getElementById("u").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("p").focus();
+});
+document.getElementById("p").addEventListener("keydown", e => {
+    if (e.key === "Enter") register();
+});
 </script>
 
 </body>
