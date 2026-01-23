@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat System - Đăng nhập</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1 class="logo">🔐 Đăng nhập</h1>
+            <p class="subtitle">Chào mừng trở lại!</p>
+            
+            <div class="form-group">
+                <label for="username">Tên đăng nhập</label>
+                <input type="text" id="username" class="input" placeholder="Nhập username..." autocomplete="username">
+                <div id="username-error" class="error-message" style="display: none;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Mật khẩu</label>
+                <input type="password" id="password" class="input" placeholder="Nhập mật khẩu..." autocomplete="current-password">
+                <div id="password-error" class="error-message" style="display: none;"></div>
+            </div>
+            
+            <div class="demo-account">
+                <h4>Tài khoản demo:</h4>
+                <p><strong>Username:</strong> admin</p>
+                <p><strong>Password:</strong> admin123</p>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <button class="btn btn-primary" onclick="login()" id="login-btn">
+                    <span>🚀</span> Đăng nhập
+                </button>
+                <div id="loading" style="display: none; margin-top: 10px;">
+                    <div class="loading"></div> Đang kết nối...
+                </div>
+            </div>
+            
+            <div id="error-message" class="error-message" style="display: none; margin: 10px 0;"></div>
+            
+            <div style="margin-top: 20px;">
+                <p>Chưa có tài khoản? 
+                    <span class="link" onclick="location.href='register.html'">Đăng ký ngay</span>
+                </p>
+                <p>
+                    <span class="link" onclick="location.href='index.html'">← Quay lại trang chủ</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let isLoading = false;
+        
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+        
+        function hideError(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+        
+        function showLoading() {
+            isLoading = true;
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('login-btn').disabled = true;
+        }
+        
+        function hideLoading() {
+            isLoading = false;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('login-btn').disabled = false;
+        }
+        
+        function connectWebSocket() {
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                return ws;
+            }
+            
+            ws = new WebSocket('ws://localhost:8765');
+            
+            ws.onopen = function() {
+                console.log('✅ Đã kết nối tới server');
+                document.getElementById('error-message').style.display = 'none';
+            };
+            
+            ws.onerror = function(error) {
+                console.error('❌ Lỗi kết nối:', error);
+                showError('error-message', 'Không thể kết nối tới server. Hãy chạy server.py trước!');
+                hideLoading();
+            };
+            
+            ws.onclose = function() {
+                console.log('📡 Đã ngắt kết nối');
+                if (isLoading) {
+                    setTimeout(connectWebSocket, 1000);
+                }
+            };
+            
+            ws.onmessage = function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    
+                    if (data.type === 'login_success') {
+                        hideLoading();
+                        
+                        // Lưu thông tin đăng nhập
+                        localStorage.setItem('username', data.username);
+                        localStorage.setItem('role', data.role);
+                        localStorage.setItem('room', data.room);
+                        
+                        // Chuyển đến trang chat
+                        window.location.href = 'chat.html';
+                        
+                    } else if (data.type === 'login_fail') {
+                        hideLoading();
+                        showError('error-message', data.message || 'Đăng nhập thất bại');
+                        
+                    } else if (data.type === 'error') {
+                        hideLoading();
+                        showError('error-message', data.message);
+                    }
+                    
+                } catch (err) {
+                    console.error('Lỗi parse JSON:', err);
+                }
+            };
+            
+            return ws;
+        }
+        
+        function login() {
+            // Reset lỗi
+            hideError('username-error');
+            hideError('password-error');
+            hideError('error-message');
+            
+            // Lấy giá trị
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            // Validate
+            let hasError = false;
+            
+            if (!username) {
+                showError('username-error', 'Vui lòng nhập username');
+                hasError = true;
+            }
+            
+            if (!password) {
+                showError('password-error', 'Vui lòng nhập mật khẩu');
+                hasError = true;
+            }
+            
+            if (hasError) return;
+            
+            // Hiển thị loading
+            showLoading();
+            
+            // Kết nối WebSocket và gửi login
+            const socket = connectWebSocket();
+            
+            // Gửi sau khi kết nối thành công
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'login',
+                    username: username,
+                    password: password,
+                    room: 'general'
+                }));
+            } else {
+                socket.onopen = function() {
+                    socket.send(JSON.stringify({
+                        type: 'login',
+                        username: username,
+                        password: password,
+                        room: 'general'
+                    }));
+                };
+            }
+        }
+        
+        // Cho phép nhấn Enter để đăng nhập
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+        
+        // Tự động focus vào username
+        document.getElementById('username').focus();
+        
+        // Kết nối WebSocket khi trang load
+        connectWebSocket();
+    </script>
+</body>
+</html>

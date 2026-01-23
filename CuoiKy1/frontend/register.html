@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Đăng ký tài khoản</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 Đăng ký</h1>
+
+    <input id="u" placeholder="Tên đăng nhập mới" autofocus>
+    <input id="p" type="password" placeholder="Mật khẩu">
+
+    <button onclick="register()">Đăng Ký</button>
+
+    <div class="link" onclick="window.location.href='login.html'">
+        Đã có tài khoản? <b>Đăng nhập ngay</b>
+    </div>
+</div>
+
+<script>
+    const ws = new WebSocket("ws://localhost:8765");
+
+    ws.onopen = () => {
+        console.log("Đã kết nối Server đăng ký!");
+    };
+
+    function register() {
+        const u = document.getElementById("u").value.trim();
+        const p = document.getElementById("p").value.trim();
+
+        if (!u || !p) {
+            alert("Vui lòng nhập đầy đủ tên và mật khẩu!");
+            return;
+        }
+
+        // Gửi lệnh đăng ký
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "register",
+                username: u,
+                password: p
+            }));
+        } else {
+            alert("Chưa kết nối được Server. Hãy F5 thử lại!");
+        }
+    }
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // --- NẾU THÀNH CÔNG (ĐOẠN ĐÃ SỬA) ---
+        if (data.type === "register_ok") {
+            // Dùng confirm để hiện bảng OK/Cancel. Bấm gì cũng sẽ chuyển trang.
+            if(confirm("✅ Đăng ký thành công! Bấm OK để đăng nhập ngay.")) {
+                // replace tốt hơn href vì nó không cho user bấm Back để quay lại trang đăng ký
+                window.location.replace("login.html");
+            } else {
+                window.location.href = "login.html";
+            }
+        }
+
+        // --- NẾU THẤT BẠI ---
+        if (data.type === "register_fail") {
+            alert("❌ Lỗi: " + (data.message || "Tên này đã có người dùng!"));
+        }
+    };
+
+    // --- XỬ LÝ PHÍM ENTER ---
+    document.getElementById("u").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") document.getElementById("p").focus();
+    });
+
+    document.getElementById("p").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") register();
+    });
+</script>
+
+</body>
+</html>

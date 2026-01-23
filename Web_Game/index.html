@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Kéo Búa Bao</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 { text-align: center; margin-bottom: 30px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            background: rgba(255,255,255,0.3);
+            color: white;
+            transition: 0.3s;
+        }
+        button:hover { background: rgba(255,255,255,0.5); transform: scale(1.02); }
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+        }
+        .choices {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .choice {
+            padding: 30px;
+            font-size: 3em;
+            text-align: center;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .choice:hover { background: rgba(255,255,255,0.4); transform: scale(1.1); }
+        .info {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .score { font-size: 1.5em; font-weight: bold; margin: 15px 0; }
+        .result {
+            text-align: center;
+            padding: 30px;
+        }
+        .result-choices {
+            display: flex;
+            justify-content: space-around;
+            font-size: 4em;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Kéo Búa Bao</h1>
+
+        <!-- Menu -->
+        <div id="menu" class="screen active">
+            <button onclick="showMode('ai')">🤖 Chơi với Máy</button>
+            <button onclick="showMode('online')">🌐 Chơi Online</button>
+        </div>
+
+        <!-- Nhập tên -->
+        <div id="name" class="screen">
+            <input type="text" id="playerName" placeholder="Nhập tên của bạn">
+            <button onclick="startGame()">Bắt đầu</button>
+            <button onclick="show('menu')">Quay lại</button>
+        </div>
+
+        <!-- Chờ đối thủ -->
+        <div id="waiting" class="screen">
+            <div class="info">
+                <h2>Đang tìm đối thủ...</h2>
+            </div>
+            <button onclick="show('menu')">Hủy</button>
+        </div>
+
+        <!-- Chơi game -->
+        <div id="game" class="screen">
+            <div class="info">
+                <div id="opponent">Đối thủ: AI</div>
+                <div class="score">
+                    Bạn: <span id="score1">0</span> - <span id="score2">0</span> :Đối thủ
+                </div>
+            </div>
+            <div id="status" class="info">Chọn nước đi!</div>
+            <div class="choices">
+                <div class="choice" onclick="choose('kéo')">✌️</div>
+                <div class="choice" onclick="choose('búa')">✊️</div>
+                <div class="choice" onclick="choose('bao')">🖐</div>
+            </div>
+        </div>
+
+        <!-- Kết quả -->
+        <div id="result" class="screen">
+            <div class="result">
+                <div class="result-choices">
+                    <span id="yourChoice">✌️</span>
+                    <span style="font-size:0.5em">VS</span>
+                    <span id="oppChoice">✌️</span>
+                </div>
+                <div id="resultMsg" class="info" style="font-size:1.5em">Bạn thắng!</div>
+                <div class="score">
+                    Bạn: <span id="finalScore1">0</span> - <span id="finalScore2">0</span> :Đối thủ
+                </div>
+                <button onclick="playAgain()">Chơi lại</button>
+                <button onclick="show('menu')">Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws, mode, scores = [0, 0];
+        const icons = { 'kéo': '✌️', 'búa': '✊️', 'bao': '🖐' };
+
+        function show(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showMode(m) {
+            mode = m;
+            show('name');
+        }
+
+        function startGame() {
+            const name = document.getElementById('playerName').value || 'Player';
+            scores = [0, 0];
+            
+            if (mode === 'ai') {
+                document.getElementById('opponent').textContent = 'Đối thủ: AI';
+                updateScores();
+                show('game');
+            } else {
+                show('waiting');
+                ws = new WebSocket('ws://localhost:8765');
+                
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({ type: 'register', name: name }));
+                    ws.send(JSON.stringify({ type: 'find' }));
+                };
+                
+                ws.onmessage = (e) => {
+                    const data = JSON.parse(e.data);
+                    
+                    if (data.type === 'start') {
+                        document.getElementById('opponent').textContent = 'Đối thủ: ' + data.opp;
+                        updateScores();
+                        show('game');
+                    } else if (data.type === 'result') {
+                        scores = data.score;
+                        showResult(data.result, data.your, data.opp);
+                    }
+                };
+                
+                ws.onerror = () => {
+                    alert('Không kết nối được server!');
+                    show('menu');
+                };
+            }
+        }
+
+        function choose(choice) {
+            if (mode === 'ai') {
+                const ai = ['kéo', 'búa', 'bao'][Math.floor(Math.random() * 3)];
+                const result = getResult(choice, ai);
+                
+                if (result === 'win') scores[0]++;
+                else if (result === 'lose') scores[1]++;
+                
+                showResult(result, choice, ai);
+            } else {
+                ws.send(JSON.stringify({ type: 'choice', choice: choice }));
+                document.getElementById('status').textContent = 'Đang đợi đối thủ...';
+            }
+        }
+
+        function getResult(c1, c2) {
+            if (c1 === c2) return 'draw';
+            const wins = { 'kéo': 'bao', 'búa': 'kéo', 'bao': 'búa' };
+            return wins[c1] === c2 ? 'win' : 'lose';
+        }
+
+        function showResult(result, your, opp) {
+            document.getElementById('yourChoice').textContent = icons[your];
+            document.getElementById('oppChoice').textContent = icons[opp];
+            
+            let msg = '';
+            if (result === 'win') msg = '🎉 Bạn thắng!';
+            else if (result === 'lose') msg = '😢 Bạn thua!';
+            else msg = '🤝 Hòa!';
+            
+            document.getElementById('resultMsg').textContent = msg;
+            document.getElementById('finalScore1').textContent = scores[0];
+            document.getElementById('finalScore2').textContent = scores[1];
+            
+            show('result');
+        }
+
+        function playAgain() {
+            updateScores();
+            show('game');
+            document.getElementById('status').textContent = 'Chọn nước đi!';
+        }
+
+        function updateScores() {
+            document.getElementById('score1').textContent = scores[0];
+            document.getElementById('score2').textContent = scores[1];
+        }
+    </script>
+</body>
+</html>
