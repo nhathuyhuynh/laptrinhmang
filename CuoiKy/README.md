@@ -117,17 +117,44 @@ Bước 2 (Hậu xử lý): Server mở một luồng riêng (asyncio.to_thread)
 Kết quả: Server vẫn rảnh tay để nhận tin nhắn tiếp theo trong khi ổ cứng đang ghi dữ liệu.
 
 🗄 Cơ sở dữ liệu (Schema)
-File chat.db gồm 2 bảng chính:
-1. Bảng users (Lưu tài khoản)
-username | TEXT  |(PK)Tên đăng nhập (Khóa chính - Duy nhất).
-password | TEXT  | Mật khẩu đã mã hóa (SHA-256 Hex Digest).
 
-2. Bảng messages (Lưu lịch sử chat)
-id	    |INTEGER (PK)	|ID tự tăng.
-room	| TEXT	        | ID phòng chat (vd: 'general', 'tech').
-sender	| TEXT	        | Tên người gửi.
-message	| TEXT	        | Nội dung (Text hoặc chuỗi Base64 ảnh).
-timestamp	DATETIME	| Thời gian gửi (Mặc định: Current Time).
+Hệ thống sử dụng SQLite (chat.db) với 3 bảng chính:
+
+1️⃣ Bảng users (Lưu tài khoản người dùng)
+
+| Cột | Kiểu dữ liệu | Mô tả |
+
+| id | INTEGER (PK) | ID tự tăng |
+| username | TEXT   | Tên đăng nhập (Duy nhất) |
+| password | TEXT   | Mật khẩu đã mã hóa (SHA-256) |
+| role     | TEXT   | Quyền người dùng (mặc định: user) |
+| created_at | DATETIME | Thời điểm tạo tài khoản |
+
+---
+
+2️⃣ Bảng messages (Lưu lịch sử chat phòng chung)
+
+| Cột | Kiểu dữ liệu | Mô tả |
+
+| id  | INTEGER (PK) | ID tự tăng |
+| room |    TEXT     | ID phòng chat (general, tech, game) |
+| sender |  TEXT     | Tên người gửi |
+| message | TEXT     | Nội dung tin nhắn |
+| msg_type | TEXT    | Loại tin nhắn (text / image) |
+| created_at | DATETIME | Thời gian gửi |
+
+---
+
+3️⃣ Bảng private_messages (Lưu lịch sử chat riêng)
+
+| Cột | Kiểu dữ liệu | Mô tả |
+
+| id  | INTEGER (PK) | ID tự tăng |
+| sender   | TEXT | Người gửi |
+| receiver | TEXT | Người nhận |
+| message  | TEXT | Nội dung tin nhắn |
+| created_at | DATETIME | Thời gian gửi |
+
 
 🔧 Khắc phục sự cố
 1. Lỗi: "Connection Refused" hoặc không kết nối được
