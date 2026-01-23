@@ -5,7 +5,7 @@
 ![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Stable-green?style=for-the-badge)
 
-Một hệ thống nhắn tin trực tuyến thời gian thực (Real-time Chat System) được xây dựng từ con số 0 (From Scratch) sử dụng **Python Asyncio** và giao thức **WebSocket**. Dự án tập trung tối ưu hóa độ trễ (Zero-latency), khả năng chịu tải cao và bảo mật dữ liệu người dùng.
+Một hệ thống nhắn tin trực tuyến thời gian thực (Real-time Chat System) được xây dựng từ con số 0 (From Scratch) sử dụng **Python Asyncio** và giao thức **WebSocket**. Dự án tập trung tối ưu hóa độ trễ (Zero-latency), khả năng chịu tải cao và bảo mật dữ liệu người dùng. Trong quá trình test local, hệ thống hoạt động ổn định với hàng chục kết nối đồng thời.
 
 ---
 
@@ -32,14 +32,15 @@ Hệ thống hỗ trợ đầy đủ quy trình: **Đăng ký -> Đăng nhập -
 
 ## ✨ Tính năng nổi bật
 
-* **⚡ Zero-Latency (Độ trễ bằng 0):** Áp dụng kiến trúc *Optimistic UI* - Tin nhắn được broadcast ngay lập tức tới các client khác trước khi ghi vào ổ cứng, giúp trải nghiệm mượt mà tuyệt đối.
+* **⚡  Low-Latency (Độ trễ rất thấp, gần thời gian thực):** Áp dụng kiến trúc Optimistic UI – Server broadcast tin nhắn ngay khi nhận được, sau đó mới ghi vào cơ sở dữ liệu ở luồng bất đồng bộ, giúp giảm cảm nhận độ trễ của người dùng mà không làm gián đoạn luồng xử lý chính của server.
+
 * **🖼️ Gửi ảnh tốc độ cao:** Hỗ trợ mã hóa Base64 để gửi và hiển thị hình ảnh trực tiếp trong khung chat.
 * **👥 Multi-Room (Đa phòng chat):**
     * Phòng Chung (General)
     * Phòng Công Nghệ (Tech)
     * Phòng Game
 * **🔐 Bảo mật lớp ứng dụng:**
-    * Mật khẩu người dùng được băm (Hashing) bằng thuật toán **SHA-256**.
+    * Mật khẩu người dùng được băm (Hashing) bằng thuật toán **SHA-256** (mức bảo mật cơ bản, có thể nâng cấp bằng Salt/Bcrypt trong tương lai).
     * Ngăn chặn SQL Injection cơ bản thông qua Parameterized Queries.
 * **💾 Persist Data (Lưu trữ vĩnh viễn):**
     * Tự động lưu tin nhắn vào SQLite.
@@ -116,17 +117,44 @@ Bước 2 (Hậu xử lý): Server mở một luồng riêng (asyncio.to_thread)
 Kết quả: Server vẫn rảnh tay để nhận tin nhắn tiếp theo trong khi ổ cứng đang ghi dữ liệu.
 
 🗄 Cơ sở dữ liệu (Schema)
-File chat.db gồm 2 bảng chính:
-1. Bảng users (Lưu tài khoản)
-username | TEXT  |(PK)Tên đăng nhập (Khóa chính - Duy nhất).
-password | TEXT  | Mật khẩu đã mã hóa (SHA-256 Hex Digest).
 
-2. Bảng messages (Lưu lịch sử chat)
-id	    |INTEGER (PK)	|ID tự tăng.
-room	| TEXT	        | ID phòng chat (vd: 'general', 'tech').
-sender	| TEXT	        | Tên người gửi.
-message	| TEXT	        | Nội dung (Text hoặc chuỗi Base64 ảnh).
-timestamp	DATETIME	| Thời gian gửi (Mặc định: Current Time).
+Hệ thống sử dụng SQLite (chat.db) với 3 bảng chính:
+
+1️⃣ Bảng users (Lưu tài khoản người dùng)
+
+| Cột | Kiểu dữ liệu | Mô tả |
+
+| id | INTEGER (PK) | ID tự tăng |
+| username | TEXT   | Tên đăng nhập (Duy nhất) |
+| password | TEXT   | Mật khẩu đã mã hóa (SHA-256) |
+| role     | TEXT   | Quyền người dùng (mặc định: user) |
+| created_at | DATETIME | Thời điểm tạo tài khoản |
+
+---
+
+2️⃣ Bảng messages (Lưu lịch sử chat phòng chung)
+
+| Cột | Kiểu dữ liệu | Mô tả |
+
+| id  | INTEGER (PK) | ID tự tăng |
+| room |    TEXT     | ID phòng chat (general, tech, game) |
+| sender |  TEXT     | Tên người gửi |
+| message | TEXT     | Nội dung tin nhắn |
+| msg_type | TEXT    | Loại tin nhắn (text / image) |
+| created_at | DATETIME | Thời gian gửi |
+
+---
+
+3️⃣ Bảng private_messages (Lưu lịch sử chat riêng)
+
+| Cột | Kiểu dữ liệu | Mô tả |
+
+| id  | INTEGER (PK) | ID tự tăng |
+| sender   | TEXT | Người gửi |
+| receiver | TEXT | Người nhận |
+| message  | TEXT | Nội dung tin nhắn |
+| created_at | DATETIME | Thời gian gửi |
+
 
 🔧 Khắc phục sự cố
 1. Lỗi: "Connection Refused" hoặc không kết nối được
