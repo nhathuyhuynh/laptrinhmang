@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Demo WebSocket</title>
+</head>
+<body>
+    <h2>Ứng dụng WebSocket</h2>
+
+    <input id="msg" type="text" placeholder="Nhập tin nhắn">
+    <button onclick="sendMessage()">Gửi</button>
+
+    <ul id="log"></ul>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:8080");
+
+        ws.onopen = () => {
+            log("Đã kết nối tới server");
+        };
+
+        ws.onmessage = (event) => {
+            log(event.data);
+        };
+
+        ws.onerror = () => {
+            log("Lỗi kết nối WebSocket");
+        };
+
+        function sendMessage() {
+            const input = document.getElementById("msg");
+            ws.send(input.value);
+            input.value = "";
+        }
+
+        function log(message) {
+            const li = document.createElement("li");
+            li.innerText = message;
+            document.getElementById("log").appendChild(li);
+        }
+    </script>
+</body>
+</html>
