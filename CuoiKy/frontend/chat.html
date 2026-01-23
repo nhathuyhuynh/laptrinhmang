@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Chat</title>
+    <title>Chat Room Pro</title>
     
     <script>
         if (!sessionStorage.getItem('username')) {
@@ -200,30 +200,17 @@
         }
         .msg.me .msg-time { 
             color: rgba(255,255,255,0.8); 
+            align-self: flex-end; 
         }
         .msg.other .msg-time { 
             color: #a0aec0; 
+            align-self: flex-start; 
         }
         .msg img { 
             max-width: 300px; 
             border-radius: 12px; 
             margin-top: 8px; 
             cursor: pointer; 
-        }
-        .file-link { 
-            display: block; 
-            padding: 10px; 
-            background: rgba(255,255,255,0.2); 
-            border-radius: 8px; 
-            color: white; 
-            text-decoration: none; 
-            margin-top: 8px; 
-            font-size: 0.9rem; 
-            word-break: break-all; 
-        }
-        .msg.other .file-link { 
-            background: #f0f0f0; 
-            color: var(--dark); 
         }
         .input-area { 
             padding: 20px; 
@@ -304,8 +291,8 @@
         }
         .emoji-picker span:hover { transform: scale(1.2); }
 
-        /* Preview ảnh/file */
-        .preview-container { 
+        /* Preview ảnh */
+        .image-preview { 
             position: absolute; 
             bottom: 70px; 
             left: 70px; 
@@ -316,21 +303,13 @@
             max-width: 300px; 
             display: none; 
         }
-        .preview-container.active { display: block; }
-        .preview-container img { 
+        .image-preview.active { display: block; }
+        .image-preview img { 
             max-width: 280px; 
             max-height: 200px; 
             border-radius: 8px; 
         }
-        .preview-container .file-info { 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-        }
-        .preview-container .icon { font-size: 2rem; color: var(--primary); }
-        .preview-container .name { font-weight: bold; }
-        .preview-container .size { font-size: 0.8rem; color: #888; }
-        .preview-container .remove { 
+        .image-preview .remove { 
             position: absolute; 
             top: -8px; 
             right: -8px; 
@@ -490,22 +469,15 @@
             
             <form class="input-area" onsubmit="sendPublic(); return false;">
                 <button type="button" class="action-btn" id="emoji-btn-public">😀</button>
-                <button type="button" class="action-btn" id="file-btn-public">📁</button>
+                <button type="button" class="action-btn" id="image-btn-public">📎</button>
                 <input type="text" id="msg-input" class="chat-input" placeholder="Nhập tin nhắn..." autocomplete="off">
                 <button type="submit" class="send-btn">➤</button>
                 <div class="emoji-picker" id="emoji-picker-public"></div>
-                <div class="preview-container" id="preview-public">
-                    <div class="remove" onclick="cancelPending('public')">✕</div>
-                    <img id="preview-img-public" style="display:none">
-                    <div class="file-info" id="preview-file-public" style="display:none">
-                        <div class="icon">📄</div>
-                        <div>
-                            <div class="name" id="preview-name-public"></div>
-                            <div class="size" id="preview-size-public"></div>
-                        </div>
-                    </div>
+                <div class="image-preview" id="image-preview-public">
+                    <div class="remove" onclick="cancelImage('public')">✕</div>
+                    <img id="preview-img-public">
                 </div>
-                <input type="file" id="file-input-public" style="display:none">
+                <input type="file" id="image-input-public" accept="image/*" style="display:none">
             </form>
         </div>
     </div>
@@ -528,22 +500,15 @@
             
             <form class="private-input-area" onsubmit="sendPrivate(); return false;">
                 <button type="button" class="action-btn" id="emoji-btn-private">😀</button>
-                <button type="button" class="action-btn" id="file-btn-private">📁</button>
+                <button type="button" class="action-btn" id="image-btn-private">📎</button>
                 <input type="text" id="private-input" class="chat-input" placeholder="Nhập tin nhắn riêng..." autocomplete="off">
                 <button type="submit" class="send-btn">➤</button>
                 <div class="emoji-picker" id="emoji-picker-private"></div>
-                <div class="preview-container" id="preview-private">
-                    <div class="remove" onclick="cancelPending('private')">✕</div>
-                    <img id="preview-img-private" style="display:none">
-                    <div class="file-info" id="preview-file-private" style="display:none">
-                        <div class="icon">📄</div>
-                        <div>
-                            <div class="name" id="preview-name-private"></div>
-                            <div class="size" id="preview-size-private"></div>
-                        </div>
-                    </div>
+                <div class="image-preview" id="image-preview-private">
+                    <div class="remove" onclick="cancelImage('private')">✕</div>
+                    <img id="preview-img-private">
                 </div>
-                <input type="file" id="file-input-private" style="display:none">
+                <input type="file" id="image-input-private" accept="image/*" style="display:none">
             </form>
         </div>
     </div>
@@ -553,7 +518,7 @@
         let currentRoom = sessionStorage.getItem('currentRoom') || 'general';
         let ws = null;
         let privateUser = null;
-        let pending = { type: null, data: null, name: null, size: null };
+        let pendingImage = { type: null, base64: null };
 
         if (myUsername) {
             document.getElementById('my-name').textContent = myUsername;
@@ -582,56 +547,56 @@
         document.getElementById('emoji-btn-public').onclick = () => document.getElementById('emoji-picker-public').classList.toggle('active');
         document.getElementById('emoji-btn-private').onclick = () => document.getElementById('emoji-picker-private').classList.toggle('active');
 
-        function handleFileSelect(fileInputId, chatType) {
+        function handleImageSelect(fileInputId, previewId, previewImgId, chatType) {
             const fileInput = document.getElementById(fileInputId);
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
-                if (!file) return;
+                if (!file || !file.type.startsWith('image/')) return;
 
-                if (file.size > 10 * 1024 * 1024) {
-                    alert('File quá lớn (>10MB), chọn file nhỏ hơn!');
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Ảnh quá lớn (>5MB), chọn ảnh nhỏ hơn!');
                     fileInput.value = '';
                     return;
                 }
 
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const base64 = ev.target.result;
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxWidth = 800;
+                    let width = img.width;
+                    let height = img.height;
 
-                    pending = { type: chatType, data: base64, name: file.name, size: formatFileSize(file.size) };
-
-                    if (file.type.startsWith('image/')) {
-                        document.getElementById(`preview-img-${chatType}`).src = base64;
-                        document.getElementById(`preview-img-${chatType}`).style.display = 'block';
-                        document.getElementById(`preview-file-${chatType}`).style.display = 'none';
-                    } else {
-                        document.getElementById(`preview-name-${chatType}`).textContent = file.name;
-                        document.getElementById(`preview-size-${chatType}`).textContent = formatFileSize(file.size);
-                        document.getElementById(`preview-file-${chatType}`).style.display = 'flex';
-                        document.getElementById(`preview-img-${chatType}`).style.display = 'none';
+                    if (width > maxWidth) {
+                        height = (maxWidth / width) * height;
+                        width = maxWidth;
                     }
-                    document.getElementById(`preview-${chatType}`).classList.add('active');
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const base64 = canvas.toDataURL('image/jpeg', 0.8);
+
+                    document.getElementById(previewImgId).src = base64;
+                    document.getElementById(previewId).classList.add('active');
+
+                    pendingImage = { type: chatType, base64 };
                 };
-                reader.readAsDataURL(file);
+                img.src = URL.createObjectURL(file);
             };
         }
 
-        function formatFileSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
+        handleImageSelect('image-input-public', 'image-preview-public', 'preview-img-public', 'public');
+        handleImageSelect('image-input-private', 'image-preview-private', 'preview-img-private', 'private');
 
-        handleFileSelect('file-input-public', 'public');
-        handleFileSelect('file-input-private', 'private');
+        document.getElementById('image-btn-public').onclick = () => document.getElementById('image-input-public').click();
+        document.getElementById('image-btn-private').onclick = () => document.getElementById('image-input-private').click();
 
-        document.getElementById('file-btn-public').onclick = () => document.getElementById('file-input-public').click();
-        document.getElementById('file-btn-private').onclick = () => document.getElementById('file-input-private').click();
-
-        function cancelPending(chatType) {
-            pending = { type: null, data: null, name: null, size: null };
-            document.getElementById(`preview-${chatType}`).classList.remove('active');
-            document.getElementById(`file-input-${chatType}`).value = '';
+        function cancelImage(chatType) {
+            pendingImage = { type: null, base64: null };
+            document.getElementById(`image-preview-${chatType}`).classList.remove('active');
+            document.getElementById(`image-input-${chatType}`).value = '';
         }
 
         function showToast(message) {
@@ -643,14 +608,9 @@
             setTimeout(() => toast.remove(), 5000);
         }
 
-        function getVietnamTime() {
-            const options = { 
-                timeZone: 'Asia/Ho_Chi_Minh', 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                hour12: false 
-            };
-            return new Date().toLocaleTimeString('vi-VN', options);
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toTimeString().slice(0,5);
         }
 
         function shouldAutoScroll(box) {
@@ -683,8 +643,9 @@
 
                 if (data.type === 'message') {
                     const isMe = data.sender === myUsername;
+                    // Chỉ append nếu không phải tin của mình (tin mình đã append khi gửi)
                     if (!isMe) {
-                        appendMsg(data.sender, data.message, data.time || getVietnamTime(), isMe, 'chat-box');
+                        appendMsg(data.sender, data.message, data.time || getCurrentTime(), isMe, 'chat-box');
                         if (shouldAutoScroll(document.getElementById('chat-box'))) {
                             scrollToBottom(document.getElementById('chat-box'));
                         }
@@ -703,12 +664,12 @@
                 }
 
                 if (data.type === 'private_message') {
-                    const isMe = data.sender === myUsername || data.is_me;
+                    const isMe = data.sender === myUsername;
                     const fromUser = data.sender;
 
                     if (privateUser && privateUser === fromUser) {
-                        if (!isMe) { // Chỉ append tin nhận (tin gửi đã append local)
-                            appendMsg(fromUser, data.message, data.time || getVietnamTime(), isMe, 'private-box');
+                        if (!isMe) {
+                            appendMsg(fromUser, data.message, data.time || getCurrentTime(), isMe, 'private-box');
                             if (shouldAutoScroll(document.getElementById('private-box'))) {
                                 scrollToBottom(document.getElementById('private-box'));
                             }
@@ -734,15 +695,14 @@
             const val = input.value.trim();
 
             let sent = false;
-            if (pending.type === 'public' && pending.data) {
-                const message = `FILE|${pending.name}|${pending.data}`;
-                ws.send(JSON.stringify({ type: 'message', message }));
-                appendMsg(myUsername, message, getVietnamTime(), true, 'chat-box');
-                cancelPending('public');
+            if (pendingImage.type === 'public' && pendingImage.base64) {
+                ws.send(JSON.stringify({ type: 'message', message: pendingImage.base64 }));
+                appendMsg(myUsername, pendingImage.base64, getCurrentTime(), true, 'chat-box');
+                cancelImage('public');
                 sent = true;
             } else if (val) {
                 ws.send(JSON.stringify({ type: 'message', message: val }));
-                appendMsg(myUsername, val, getVietnamTime(), true, 'chat-box');
+                appendMsg(myUsername, val, getCurrentTime(), true, 'chat-box');
                 sent = true;
             }
 
@@ -758,15 +718,14 @@
             const val = input.value.trim();
 
             let sent = false;
-            if (pending.type === 'private' && pending.data) {
-                const message = `FILE|${pending.name}|${pending.data}`;
-                ws.send(JSON.stringify({ type: 'private_message', to: privateUser, message }));
-                appendMsg(myUsername, message, getVietnamTime(), true, 'private-box');
-                cancelPending('private');
+            if (pendingImage.type === 'private' && pendingImage.base64) {
+                ws.send(JSON.stringify({ type: 'private_message', to: privateUser, message: pendingImage.base64 }));
+                appendMsg(myUsername, pendingImage.base64, getCurrentTime(), true, 'private-box');
+                cancelImage('private');
                 sent = true;
             } else if (val) {
                 ws.send(JSON.stringify({ type: 'private_message', to: privateUser, message: val }));
-                appendMsg(myUsername, val, getVietnamTime(), true, 'private-box');
+                appendMsg(myUsername, val, getCurrentTime(), true, 'private-box');
                 sent = true;
             }
 
@@ -795,7 +754,7 @@
         function renderMessages(list, elementId) {
             const box = document.getElementById(elementId);
             box.innerHTML = '';
-            list.forEach(m => appendMsg(m.sender, m.message, m.time || getVietnamTime(), m.sender === myUsername, elementId));
+            list.forEach(m => appendMsg(m.sender, m.message, m.time || getCurrentTime(), m.sender === myUsername, elementId));
         }
 
         function appendMsg(sender, content, time, isMe, elementId) {
@@ -807,11 +766,6 @@
             let bubbleContent = '';
             if (content.startsWith('data:image/')) {
                 bubbleContent = `<img src="${content}" alt="Ảnh" onclick="window.open(this.src)">`;
-            } else if (content.startsWith('FILE|')) {
-                const parts = content.split('|');
-                const name = parts[1];
-                const base64 = parts[2];
-                bubbleContent = `<a href="${base64}" download="${name}" class="file-link">📄 ${name}</a>`;
             } else {
                 bubbleContent = content.replace(/\n/g, '<br>');
             }
@@ -838,7 +792,7 @@
         function closePrivate() {
             document.getElementById('private-modal').classList.remove('active');
             privateUser = null;
-            pending = { type: null, data: null, name: null, size: null };
+            pendingImage = { type: null, base64: null };
         }
 
         function logout() {
